@@ -3,7 +3,7 @@
    and persists every mutation in the background (optimistic updates — the UI
    never waits on the network; failures are logged to the console). */
 import React from "react";
-import { supabase } from "../lib/supabase";
+import { supabase, supabaseConfigured } from "../lib/supabase";
 import { WORKO_DATA, type Priority, type Status } from "../data/data";
 import {
   TODAY, registerMembers, startFromDue, toInputDate,
@@ -62,6 +62,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   membersRef.current = members;
 
   React.useEffect(() => {
+    if (!supabaseConfigured) return;
     let cancelled = false;
     (async () => {
       const [m, p, pm, t, s] = await Promise.all([

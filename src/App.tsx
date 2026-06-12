@@ -3,6 +3,7 @@ import { Sidebar, TopBar, type NavId } from "./app/AppShell";
 import { Icon } from "./components/Icon";
 import { formatLongDate } from "./lib/format";
 import { TODAY } from "./screens/project/model";
+import { supabaseConfigured } from "./lib/supabase";
 import { useWorkspace, type Project } from "./store/workspace";
 import { FocusHome } from "./screens/FocusHome";
 import { ProjectDashboard } from "./screens/ProjectDashboard";
@@ -22,6 +23,19 @@ function ComingSoon({ title }: { title: string }) {
   );
 }
 
+function ConfigNotice() {
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: 32, textAlign: "center" }}>
+      <img src="/worko-mark.svg" alt="" width="44" height="44" />
+      <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>WORKO isn't connected to its database</div>
+      <div style={{ fontSize: 14, color: "var(--text-secondary)", maxWidth: 440, lineHeight: 1.6 }}>
+        This build is missing <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>.
+        Set them in your host's environment variables (or <code>.env.local</code> for local dev), then rebuild.
+      </div>
+    </div>
+  );
+}
+
 function Splash() {
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
@@ -36,6 +50,7 @@ export default function App() {
   const [screen, setScreen] = React.useState<Screen>("home");
   const [project, setProject] = React.useState<Project | null>(null);
 
+  if (!supabaseConfigured) return <ConfigNotice />;
   if (ws.loading) return <Splash />;
 
   const remaining = ws.tasks.filter((t) => t.status !== "Done").length;
