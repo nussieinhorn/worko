@@ -1,21 +1,16 @@
-/* Task Detail Drawer — click-to-edit, auto-saved, no Save button. */
+/* Task Detail Drawer — click-to-edit, auto-saved, no Save button.
+   Every change writes straight to the workspace store (and Supabase). */
 import React from "react";
 import { Avatar, IconButton } from "../../components/ds";
 import { Icon } from "../../components/Icon";
-import { WORKO_DATA } from "../../data/data";
-import { ASSIGNEES, PRIORITY_ORDER, STATUS_ORDER, TODAY, toInputDate, type Task } from "./model";
+import { WORKO_DATA, type Priority, type Status } from "../../data/data";
+import { useWorkspace, type Subtask } from "../../store/workspace";
+import { ASSIGNEES, PRIORITY_ORDER, STATUS_ORDER, startFromDue, toInputDate, type Task } from "./model";
 
 const drawerSelect: React.CSSProperties = { height: 32, padding: "0 8px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 600, color: "var(--text-primary)", outline: "none", cursor: "pointer", appearance: "none" };
-let checkSeq = 1;
-
-interface ChecklistEntry {
-  id: string;
-  label: string;
-  done: boolean;
-}
 
 function ChecklistItem({ item, onToggle, onLabel, onDelete, onDragStart, onDragEnter, onDragEnd, dragging, dropTarget }: {
-  item: ChecklistEntry;
+  item: Subtask;
   onToggle: () => void;
   onLabel: (label: string) => void;
   onDelete: () => void;
@@ -80,35 +75,75 @@ function ChecklistItem({ item, onToggle, onLabel, onDelete, onDragStart, onDragE
   );
 }
 
-export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () => void }) {
-  const d = WORKO_DATA.taskDetail;
-  const [subs, setSubs] = React.useState<ChecklistEntry[]>(() => d.subtasks.map((s) => ({ ...s, id: "c" + (checkSeq++) })));
-  const [assignee, setAssignee] = React.useState(task?.assignee || d.assignee);
-  const [priority, setPriority] = React.useState(task?.priority || d.priority);
-  const [status, setStatus] = React.useState(task?.status || d.status);
-  const [due, setDue] = React.useState(toInputDate(task?.due || TODAY));
+function EditableTitle({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [editing, setEditing] = React.useState(false);
+  if (editing) {
+    return (
+      <input autoFocus defaultValue={value}
+        onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== value) onSave(v); setEditing(false); }}
+        onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") setEditing(false); }}
+        style={{
+          width: "100%", margin: 0, padding: "4px 8px", fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em",
+          fontFamily: "var(--font-sans)", color: "var(--text-primary)", border: "1px solid var(--color-primary)",
+          borderRadius: 8, outline: "none", boxShadow: "var(--ring)",
+        }} />
+    );
+  }
+  return (
+    <h2 onClick={() => setEditing(true)} title="Click to rename" style={{
+      margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.25,
+      color: "var(--text-primary)", cursor: "text", borderRadius: 8,
+    }}>{value}</h2>
+  );
+}
+
+function EditableDescription({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [editing, setEditing] = React.useState(false);
+  if (editing) {
+    return (
+      <textarea autoFocus defaultValue={value} rows={4}
+        onBlur={(e) => { const v = e.target.value.trim(); if (v !== value) onSave(v); setEditing(false); }}
+        onKeyDown={(e) => { if (e.key === "Escape") setEditing(false); }}
+        style={{
+          width: "100%", padding: "8px 10px", fontSize: 14, lineHeight: 1.6, fontFamily: "var(--font-sans)",
+          color: "var(--text-primary)", border: "1px solid var(--color-primary)", borderRadius: 8,
+          outline: "none", resize: "vertical",
+        }} />
+    );
+  }
+  return (
+    <p onClick={() => setEditing(true)} title="Click to edit" style={{
+      margin: 0, fontSize: 14, lineHeight: 1.6, cursor: "text",
+      color: value ? "var(--text-secondary)" : "var(--text-muted)",
+    }}>{value || "Add a description…"}</p>
+  );
+}
+
+export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void }) {
+  const ws = useWorkspace();
+  const subs = ws.subtasksFor(task.id);
   const drag = React.useRef<{ from: string; to: string } | null>(null);
   const [dragId, setDragId] = React.useState<string | null>(null);
   const [overId, setOverId] = React.useState<string | null>(null);
 
-  const toggle = (id: string) => setSubs((arr) => arr.map((s) => (s.id === id ? { ...s, done: !s.done } : s)));
-  const setLabel = (id: string, label: string) => setSubs((arr) => arr.map((s) => (s.id === id ? { ...s, label } : s)));
-  const remove = (id: string) => setSubs((arr) => arr.filter((s) => s.id !== id));
-  const addItem = (label: string) => setSubs((arr) => [...arr, { id: "c" + (checkSeq++), label, done: false }]);
   const reorder = () => {
     if (!drag.current || drag.current.from === drag.current.to) return;
     const { from, to } = drag.current;
-    setSubs((arr) => {
-      const next = arr.slice();
-      const fromIdx = next.findIndex((s) => s.id === from);
-      const toIdx = next.findIndex((s) => s.id === to);
-      if (fromIdx < 0 || toIdx < 0) return arr;
-      const [moved] = next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, moved);
-      return next;
-    });
+    const ids = subs.map((s) => s.id);
+    const fromIdx = ids.indexOf(from);
+    const toIdx = ids.indexOf(to);
+    if (fromIdx < 0 || toIdx < 0) return;
+    ids.splice(toIdx, 0, ids.splice(fromIdx, 1)[0]);
+    ws.reorderSubtasks(task.id, ids);
   };
   const doneCount = subs.filter((s) => s.done).length;
+
+  const removeTask = () => {
+    if (window.confirm("Delete this task? This can't be undone.")) {
+      ws.deleteTask(task.id);
+      onClose();
+    }
+  };
 
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 30, display: "flex", justifyContent: "flex-end" }}>
@@ -116,31 +151,38 @@ export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () =
       <div style={{ position: "relative", width: 440, height: "100%", background: "var(--surface)", boxShadow: "var(--shadow-xl)", overflow: "auto", animation: "drawerIn var(--dur-slow) var(--ease-out)" }}>
         <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <select value={status} onChange={(e) => setStatus(e.target.value as Task["status"])} style={{ ...drawerSelect, height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--color-primary)", background: "var(--color-primary-light)", border: "1px solid transparent" }}>
+            <select value={task.status} onChange={(e) => ws.updateTask(task.id, { status: e.target.value as Status })} style={{ ...drawerSelect, height: 30, fontSize: 12.5, fontWeight: 700, color: "var(--color-primary)", background: "var(--color-primary-light)", border: "1px solid transparent" }}>
               {STATUS_ORDER.map((s) => <option key={s}>{s}</option>)}
             </select>
             <span style={{ fontSize: 12.5, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 5 }}><Icon name="Check" size={14} color="var(--color-success)" />Auto-saved</span>
-            <IconButton label="Close" variant="ghost" size="sm" onClick={onClose} style={{ marginLeft: "auto" }}><Icon name="X" size={18} /></IconButton>
+            <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+              <IconButton label="Delete task" variant="ghost" size="sm" onClick={removeTask}><Icon name="Trash2" size={17} /></IconButton>
+              <IconButton label="Close" variant="ghost" size="sm" onClick={onClose}><Icon name="X" size={18} /></IconButton>
+            </span>
           </div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.25, color: "var(--text-primary)" }}>{task?.title || d.title}</h2>
+          <EditableTitle value={task.title} onSave={(title) => ws.updateTask(task.id, { title })} />
           <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", rowGap: 10, columnGap: 16, alignItems: "center", fontSize: 13.5 }}>
             <span style={{ color: "var(--text-muted)" }}>Assignee</span>
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Avatar name={assignee} size="xs" />
-              <select value={assignee} onChange={(e) => setAssignee(e.target.value)} style={{ ...drawerSelect, flex: 1 }}>
+              <Avatar name={task.assignee} size="xs" />
+              <select value={task.assignee} onChange={(e) => ws.updateTask(task.id, { assignee: e.target.value })} style={{ ...drawerSelect, flex: 1 }}>
                 {ASSIGNEES.map((a) => <option key={a}>{a}</option>)}
               </select>
             </span>
             <span style={{ color: "var(--text-muted)" }}>Priority</span>
-            <select value={priority} onChange={(e) => setPriority(e.target.value as Task["priority"])} style={{ ...drawerSelect, width: 140 }}>
+            <select value={task.priority} onChange={(e) => ws.updateTask(task.id, { priority: e.target.value as Priority })} style={{ ...drawerSelect, width: 140 }}>
               {PRIORITY_ORDER.map((p) => <option key={p}>{p}</option>)}
             </select>
             <span style={{ color: "var(--text-muted)" }}>Due</span>
-            <input type="date" value={due} onChange={(e) => setDue(e.target.value)} style={{ ...drawerSelect, width: 160 }} />
+            <input type="date" value={toInputDate(task.due)} onChange={(e) => {
+              if (!e.target.value) return;
+              const due = new Date(e.target.value + "T00:00:00");
+              ws.updateTask(task.id, { due, start: startFromDue(due, task.len), scheduled: true });
+            }} style={{ ...drawerSelect, width: 160 }} />
           </div>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-muted)", marginBottom: 7 }}>Description</div>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--text-secondary)" }}>{d.description}</p>
+            <EditableDescription value={task.description} onSave={(description) => ws.updateTask(task.id, { description })} />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
@@ -150,13 +192,15 @@ export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () =
               {subs.map((s) => (
                 <ChecklistItem key={s.id} item={s}
                   dragging={dragId === s.id} dropTarget={overId === s.id && dragId !== s.id}
-                  onToggle={() => toggle(s.id)} onLabel={(v) => setLabel(s.id, v)} onDelete={() => remove(s.id)}
+                  onToggle={() => ws.updateSubtask(s.id, { done: !s.done })}
+                  onLabel={(label) => ws.updateSubtask(s.id, { label })}
+                  onDelete={() => ws.deleteSubtask(s.id)}
                   onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; drag.current = { from: s.id, to: s.id }; setDragId(s.id); }}
                   onDragEnter={() => { if (drag.current) { drag.current.to = s.id; setOverId(s.id); } }}
                   onDragEnd={() => { setDragId(null); setOverId(null); drag.current = null; }} />
               ))}
             </div>
-            <ChecklistAdd onAdd={addItem} />
+            <ChecklistAdd onAdd={(label) => ws.addSubtask(task.id, label)} />
           </div>
           <div style={{ background: "var(--bg-app)", borderRadius: "var(--radius-card)", padding: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -164,7 +208,7 @@ export function TaskDrawer({ task, onClose }: { task: Task | null; onClose: () =
               <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-primary)" }}>WORKO assistant</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {d.aiSteps.map((s, i) => (
+              {WORKO_DATA.assistant.aiSteps.map((s, i) => (
                 <button key={i} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 500, color: "var(--text-primary)" }}>
                   <Icon name="Wand2" size={15} color="var(--color-primary)" />{s}
                 </button>

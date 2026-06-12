@@ -1,10 +1,11 @@
-/* Project Dashboard — grid of project cards; inline create. */
+/* Project Dashboard — grid of live project cards; inline create. */
 import React from "react";
 import { Button, ProgressBar, AvatarGroup, IconButton } from "../components/ds";
 import { Icon } from "../components/Icon";
-import { WORKO_DATA, type Project } from "../data/data";
+import { relTime } from "../lib/format";
+import { useWorkspace, type Project } from "../store/workspace";
 
-function ProjectCard({ p, onOpen }: { p: Project; onOpen: () => void }) {
+function ProjectCard({ p, progress, open, onOpen }: { p: Project; progress: number; open: number; onOpen: () => void }) {
   const [hover, setHover] = React.useState(false);
   return (
     <div
@@ -22,18 +23,18 @@ function ProjectCard({ p, onOpen }: { p: Project; onOpen: () => void }) {
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>{p.name}</div>
-          <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>Updated {p.activity}</div>
+          <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 2 }}>Updated {relTime(p.updatedAt)}</div>
         </div>
         <IconButton label="Project options" variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}><Icon name="MoreHorizontal" size={18} /></IconButton>
       </div>
 
-      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, color: "var(--text-secondary)", minHeight: 40 }}>{p.desc}</p>
+      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, color: "var(--text-secondary)", minHeight: 40 }}>{p.desc || "No description yet."}</p>
 
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 7, fontSize: 12.5, color: "var(--text-muted)" }}>
-          <span>{p.progress}% complete</span><span>{p.open} open tasks</span>
+          <span>{progress}% complete</span><span>{open} open task{open === 1 ? "" : "s"}</span>
         </div>
-        <ProgressBar value={p.progress} height={6} />
+        <ProgressBar value={progress} height={6} />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 4 }}>
@@ -46,10 +47,38 @@ function ProjectCard({ p, onOpen }: { p: Project; onOpen: () => void }) {
   );
 }
 
-function CreateProjectCard() {
+function CreateProjectCard({ creating, setCreating, onCreate }: { creating: boolean; setCreating: (v: boolean) => void; onCreate: (name: string) => void }) {
   const [hover, setHover] = React.useState(false);
+  const [name, setName] = React.useState("");
+  const submit = () => { if (name.trim()) { onCreate(name.trim()); setName(""); setCreating(false); } };
+
+  if (creating) {
+    return (
+      <div style={{
+        background: "var(--color-primary-light)", border: "2px dashed var(--color-primary)",
+        borderRadius: "var(--radius-card)", padding: 22, minHeight: 210,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12,
+      }}>
+        <span style={{ width: 44, height: 44, borderRadius: 12, background: "var(--color-primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon name="FolderKanban" size={20} color="#fff" />
+        </span>
+        <input
+          autoFocus value={name} placeholder="Project name, then Enter"
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") { setName(""); setCreating(false); } }}
+          onBlur={() => { if (!name.trim()) setCreating(false); }}
+          style={{
+            width: "100%", maxWidth: 240, height: 40, padding: "0 13px", textAlign: "center",
+            background: "var(--surface)", border: "1px solid var(--color-primary)", borderRadius: "var(--radius-input)",
+            fontFamily: "var(--font-sans)", fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)", outline: "none",
+          }} />
+        <span style={{ fontSize: 12.5, color: "var(--color-primary-hover)", fontWeight: 500 }}>Press Enter to create — no setup needed</span>
+      </div>
+    );
+  }
+
   return (
-    <button onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={{
+    <button onClick={() => setCreating(true)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={{
       background: hover ? "var(--color-primary-light)" : "transparent",
       border: `2px dashed ${hover ? "var(--color-primary)" : "var(--border-strong)"}`,
       borderRadius: "var(--radius-card)", padding: 22, cursor: "pointer", minHeight: 210,
@@ -67,6 +96,18 @@ function CreateProjectCard() {
 }
 
 export function ProjectDashboard({ onOpenProject }: { onOpenProject: (p: Project) => void }) {
+  const { projects, tasks, createProject } = useWorkspace();
+  const [creating, setCreating] = React.useState(false);
+
+  const statsFor = (projectId: string) => {
+    const pt = tasks.filter((t) => t.projectId === projectId);
+    const done = pt.filter((t) => t.status === "Done").length;
+    return {
+      progress: pt.length ? Math.round((done / pt.length) * 100) : 0,
+      open: pt.length - done,
+    };
+  };
+
   return (
     <div style={{ padding: 32, maxWidth: 1240, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
@@ -80,13 +121,16 @@ export function ProjectDashboard({ onOpenProject }: { onOpenProject: (p: Project
           ))}
         </div>
         <div style={{ marginLeft: "auto" }}>
-          <Button leadingIcon={<Icon name="Plus" size={18} />}>Create project</Button>
+          <Button leadingIcon={<Icon name="Plus" size={18} />} onClick={() => setCreating(true)}>Create project</Button>
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18 }}>
-        {WORKO_DATA.projects.map((p) => <ProjectCard key={p.name} p={p} onOpen={() => onOpenProject(p)} />)}
-        <CreateProjectCard />
+        {projects.map((p) => {
+          const s = statsFor(p.id);
+          return <ProjectCard key={p.id} p={p} progress={s.progress} open={s.open} onOpen={() => onOpenProject(p)} />;
+        })}
+        <CreateProjectCard creating={creating} setCreating={setCreating} onCreate={createProject} />
       </div>
     </div>
   );

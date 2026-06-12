@@ -1,19 +1,12 @@
 import React from "react";
 import { Sidebar, TopBar, type NavId } from "./app/AppShell";
 import { Icon } from "./components/Icon";
-import type { Project } from "./data/data";
+import { formatLongDate } from "./lib/format";
+import { TODAY } from "./screens/project/model";
+import { useWorkspace, type Project } from "./store/workspace";
 import { FocusHome } from "./screens/FocusHome";
 import { ProjectDashboard } from "./screens/ProjectDashboard";
 import { ProjectDetail } from "./screens/project/ProjectDetail";
-
-const TITLES: Record<NavId, [string, string]> = {
-  home: ["Focus", "Tuesday, June 9 · 5 left for today"],
-  tasks: ["My tasks", "Everything assigned to you"],
-  projects: ["Projects", "6 active projects"],
-  team: ["Team", "Workspace members"],
-  reports: ["Reports", "Productivity & momentum"],
-  settings: ["Settings", "Workspace & preferences"],
-};
 
 type Screen = NavId | "projectDetail";
 
@@ -29,9 +22,31 @@ function ComingSoon({ title }: { title: string }) {
   );
 }
 
+function Splash() {
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
+      <img src="/worko-mark.svg" alt="" width="44" height="44" />
+      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-muted)" }}>Loading your workspace…</div>
+    </div>
+  );
+}
+
 export default function App() {
+  const ws = useWorkspace();
   const [screen, setScreen] = React.useState<Screen>("home");
   const [project, setProject] = React.useState<Project | null>(null);
+
+  if (ws.loading) return <Splash />;
+
+  const remaining = ws.tasks.filter((t) => t.status !== "Done").length;
+  const TITLES: Record<NavId, [string, string]> = {
+    home: ["Focus", `${formatLongDate(TODAY)} · ${remaining} left for today`],
+    tasks: ["My tasks", "Everything assigned to you"],
+    projects: ["Projects", `${ws.projects.length} active project${ws.projects.length === 1 ? "" : "s"}`],
+    team: ["Team", "Workspace members"],
+    reports: ["Reports", "Productivity & momentum"],
+    settings: ["Settings", "Workspace & preferences"],
+  };
 
   const navigate = (id: NavId) => { setProject(null); setScreen(id); };
   const openProject = (p: Project) => { setProject(p); setScreen("projectDetail"); };

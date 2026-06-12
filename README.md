@@ -2,7 +2,7 @@
 
 **Your AI work companion.** WORKO doesn't just organize tasks — it helps you complete them: it tells you what to work on next, guides your focus, and keeps momentum all day.
 
-Vite + React 19 + TypeScript, styled with the WORKO design system (CSS custom-property tokens, Inter, Lucide icons).
+Vite + React 19 + TypeScript, styled with the WORKO design system (CSS custom-property tokens, Inter, Lucide icons). Data lives in Supabase — tasks, projects, members, and checklists all persist.
 
 ## Run it
 
@@ -11,6 +11,17 @@ npm install
 npm run dev      # http://localhost:5173
 npm run build    # typecheck + production build
 ```
+
+Requires a `.env.local` with the Supabase connection (not committed):
+
+```
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+## Data
+
+`src/store/workspace.tsx` loads the whole workspace once at startup and applies every mutation optimistically — the UI updates instantly and the write persists to Supabase in the background. Tables: `members`, `projects`, `project_members`, `tasks`, `subtasks` (schema lives in Supabase migrations). Single-user for now: RLS is enabled with permissive dev policies; swap in per-user policies when auth lands.
 
 ## What's here
 

@@ -2,13 +2,13 @@
 import React from "react";
 import { Avatar, Badge } from "../../components/ds";
 import { Icon } from "../../components/Icon";
+import { formatMonthYear } from "../../lib/format";
 import {
   COLUMN_DOT, DOW, MON, PRIORITY_TONE, TL_DAYS, TODAY, TODAY_IDX,
   fmtDate, groupMeta, groupTasks, idxToDue, sameDay, sundayOf,
-  type Task, type TaskFilter,
+  type NewTaskInput, type Task, type TaskFilter,
 } from "./model";
 import { EmptyState, MiniInput, QuickAdd, Tip } from "./shared";
-import type { NewTaskInput } from "./ProjectDetail";
 
 /* ============================ Board view ============================ */
 function TaskCard({ task, onOpen, dragging, onDragStart, onDragEnd }: {
@@ -130,9 +130,8 @@ function ListRow({ task, done, onToggle, onOpen }: { task: Task; done: boolean; 
   );
 }
 
-export function ListView({ f, completed, onToggle, onOpenTask, onAdd }: {
+export function ListView({ f, onToggle, onOpenTask, onAdd }: {
   f: TaskFilter;
-  completed: Record<string, boolean>;
   onToggle: (id: string) => void;
   onOpenTask: (t: Task) => void;
   onAdd: (t: NewTaskInput) => void;
@@ -140,7 +139,7 @@ export function ListView({ f, completed, onToggle, onOpenTask, onAdd }: {
   if (!f.filtered.length) return <EmptyState label="Try clearing search or filters." />;
   const groups = groupTasks(f.filtered, f.groupBy);
   const meta = groupMeta(f.groupBy === "none" ? "status" : f.groupBy);
-  const doneCount = f.filtered.filter((t) => completed[t.id]).length;
+  const doneCount = f.filtered.filter((t) => t.status === "Done").length;
   return (
     <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-card)", boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 130px 92px 96px 40px", gap: 14, padding: "11px 18px", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)" }}>
@@ -153,7 +152,7 @@ export function ListView({ f, completed, onToggle, onOpenTask, onAdd }: {
             <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-secondary)" }}>{label}</span>
             <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>{tasks.length}</span>
           </div>
-          {tasks.map((t) => <ListRow key={t.id} task={t} done={!!completed[t.id]} onToggle={() => onToggle(t.id)} onOpen={() => onOpenTask(t)} />)}
+          {tasks.map((t) => <ListRow key={t.id} task={t} done={t.status === "Done"} onToggle={() => onToggle(t.id)} onOpen={() => onOpenTask(t)} />)}
           <div style={{ borderTop: "1px solid var(--border)", padding: "4px 12px" }}>
             <QuickAdd onAdd={(title) => onAdd(f.groupBy === "none" ? { title } : { title, [meta.field]: label } as NewTaskInput)} />
           </div>
@@ -243,11 +242,12 @@ export function CalendarView({ f, onOpenTask, onSchedule, onAdd }: {
   const backlog = f.filtered.filter((t) => t.scheduled === false);
   const tasksOn = (d: Date) => scheduled.filter((t) => sameDay(t.due, d));
 
-  // month cells
-  const first = new Date(2026, 5, 1), lead = first.getDay(), daysIn = 30;
+  // month cells for the current month
+  const year = TODAY.getFullYear(), month = TODAY.getMonth();
+  const first = new Date(year, month, 1), lead = first.getDay(), daysIn = new Date(year, month + 1, 0).getDate();
   const cells: Array<Date | null> = [];
   for (let i = 0; i < lead; i++) cells.push(null);
-  for (let d = 1; d <= daysIn; d++) cells.push(new Date(2026, 5, d));
+  for (let d = 1; d <= daysIn; d++) cells.push(new Date(year, month, d));
   while (cells.length % 7 !== 0) cells.push(null);
   const weekDays = Array.from({ length: 7 }, (_, i) => { const d = sundayOf(TODAY); d.setDate(d.getDate() + i); return d; });
 
@@ -269,7 +269,7 @@ export function CalendarView({ f, onOpenTask, onSchedule, onAdd }: {
     <div style={{ display: "flex", gap: 16, alignItems: "stretch" }}>
       <div style={{ flex: 1, minWidth: 0, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-card)", boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 18px", borderBottom: "1px solid var(--border)" }}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>{mode === "day" ? `${MON[TODAY.getMonth()]} ${TODAY.getDate()}, 2026` : "June 2026"}</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>{mode === "day" ? `${MON[TODAY.getMonth()]} ${TODAY.getDate()}, ${TODAY.getFullYear()}` : formatMonthYear(TODAY)}</span>
           <div style={{ display: "flex", gap: 4 }}>
             <span style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-muted)" }}><Icon name="ChevronLeft" size={16} /></span>
             <span style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-muted)" }}><Icon name="ChevronRight" size={16} /></span>

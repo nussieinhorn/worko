@@ -1,8 +1,12 @@
-/* Focus Home — the primary, focus-first experience. */
+/* Focus Home — the primary, focus-first experience. Hero + queue come from
+   the workspace store; completing anywhere persists to the database. */
 import React from "react";
 import { Button, Badge, ProgressBar, Switch } from "../components/ds";
 import { Icon } from "../components/Icon";
 import { WORKO_DATA } from "../data/data";
+import { formatLongDate } from "../lib/format";
+import { PRIORITY_ORDER, TODAY, type Task } from "./project/model";
+import { useWorkspace } from "../store/workspace";
 
 function StatBlock({ value, label, accent }: { value: React.ReactNode; label: string; accent?: string }) {
   return (
@@ -74,7 +78,7 @@ export function CoachPanel() {
   );
 }
 
-function FocusSession({ onExit }: { onExit: () => void }) {
+function FocusSession({ task, onComplete, onExit }: { task: Task; onComplete: () => void; onExit: () => void }) {
   const [seconds, setSeconds] = React.useState(25 * 60);
   const [running, setRunning] = React.useState(true);
   const [music, setMusic] = React.useState(true);
@@ -85,7 +89,6 @@ function FocusSession({ onExit }: { onExit: () => void }) {
   }, [running]);
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
-  const task = WORKO_DATA.focusTask;
 
   return (
     <div style={{
@@ -108,8 +111,8 @@ function FocusSession({ onExit }: { onExit: () => void }) {
           leadingIcon={<Icon name={running ? "Pause" : "Play"} size={18} />}>
           {running ? "Pause" : "Resume"}
         </Button>
-        <Button variant="secondary" size="lg" leadingIcon={<Icon name="Plus" size={18} />}>Extend 10 min</Button>
-        <Button variant="primary" size="lg" onClick={onExit} leadingIcon={<Icon name="Check" size={18} />}>Complete task</Button>
+        <Button variant="secondary" size="lg" onClick={() => setSeconds((s) => s + 10 * 60)} leadingIcon={<Icon name="Plus" size={18} />}>Extend 10 min</Button>
+        <Button variant="primary" size="lg" onClick={onComplete} leadingIcon={<Icon name="Check" size={18} />}>Complete task</Button>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 28, padding: "10px 16px", background: "rgba(255,255,255,0.7)", border: "1px solid var(--border)", borderRadius: "var(--radius-pill)", backdropFilter: "blur(8px)" }}>
@@ -122,37 +125,72 @@ function FocusSession({ onExit }: { onExit: () => void }) {
 }
 
 export function FocusHome() {
+  const { tasks, projects, updateTask } = useWorkspace();
   const [inSession, setInSession] = React.useState(false);
   const [upNextOpen, setUpNextOpen] = React.useState(true);
-  const t = WORKO_DATA.focusTask;
-  const d = WORKO_DATA.today;
+  const [skipped, setSkipped] = React.useState<string[]>([]);
+
+  const open = tasks
+    .filter((t) => t.status !== "Done")
+    .sort((a, b) =>
+      PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority) ||
+      a.due.getTime() - b.due.getTime());
+  // skipped tasks go to the back of the queue for the day
+  const queue = [...open.filter((t) => !skipped.includes(t.id)), ...open.filter((t) => skipped.includes(t.id))];
+  const hero = queue[0];
+  const upNext = queue.slice(1, 4);
+
+  const total = tasks.length;
+  const done = tasks.filter((t) => t.status === "Done").length;
+  const progress = total ? Math.round((done / total) * 100) : 0;
+
+  const complete = (id: string) => updateTask(id, { status: "Done" });
 
   return (
     <div style={{ position: "relative", height: "100%", overflow: "auto" }}>
-      {inSession && <FocusSession onExit={() => setInSession(false)} />}
+      {inSession && hero && (
+        <FocusSession
+          task={hero}
+          onComplete={() => { complete(hero.id); setInSession(false); }}
+          onExit={() => setInSession(false)}
+        />
+      )}
       <div style={{ padding: 32, display: "grid", gridTemplateColumns: "minmax(0, 1fr) 340px", alignItems: "start", gap: 24, maxWidth: 1140, margin: "0 auto" }}>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {/* Hero task */}
-          <div style={{
-            background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-card)",
-            boxShadow: "var(--shadow-md)", padding: 32,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
-              <Badge tone="primary">Up now</Badge>
-              <Badge tone="warning" dot>{t.priority} priority</Badge>
+          {hero ? (
+            <div style={{
+              background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-card)",
+              boxShadow: "var(--shadow-md)", padding: 32,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
+                <Badge tone="primary">Up now</Badge>
+                <Badge tone={hero.priority === "High" ? "warning" : "neutral"} dot>{hero.priority} priority</Badge>
+              </div>
+              <h2 style={{ margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: "-0.025em", lineHeight: 1.1, color: "var(--text-primary)" }}>{hero.title}</h2>
+              <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 16, color: "var(--text-secondary)", fontSize: 14.5 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 7 }}><Icon name="FolderKanban" size={17} color="var(--text-muted)" />{projects.find((p) => p.id === hero.projectId)?.name ?? "—"}</span>
+                {hero.estimate && <span style={{ display: "flex", alignItems: "center", gap: 7 }}><Icon name="Clock" size={17} color="var(--text-muted)" />{hero.estimate}</span>}
+              </div>
+              <div style={{ display: "flex", gap: 12, marginTop: 26, flexWrap: "wrap" }}>
+                <Button size="lg" leadingIcon={<Icon name="Play" size={19} />} onClick={() => setInSession(true)}>Start focus session</Button>
+                <Button variant="secondary" size="lg" leadingIcon={<Icon name="Check" size={18} />} onClick={() => complete(hero.id)}>Complete</Button>
+                <Button variant="ghost" size="lg" leadingIcon={<Icon name="SkipForward" size={18} />} onClick={() => setSkipped((s) => [...s, hero.id])}>Skip</Button>
+              </div>
             </div>
-            <h2 style={{ margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: "-0.025em", lineHeight: 1.1, color: "var(--text-primary)" }}>{t.title}</h2>
-            <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 16, color: "var(--text-secondary)", fontSize: 14.5 }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 7 }}><Icon name="FolderKanban" size={17} color="var(--text-muted)" />{t.project}</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 7 }}><Icon name="Clock" size={17} color="var(--text-muted)" />{t.estimate}</span>
+          ) : (
+            <div style={{
+              background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-card)",
+              boxShadow: "var(--shadow-md)", padding: 48, textAlign: "center",
+            }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: "var(--green-50)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                <Icon name="CheckCheck" size={26} color="var(--color-success)" />
+              </div>
+              <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Nothing left for today.</h2>
+              <p style={{ margin: "8px 0 0", fontSize: 15, color: "var(--text-secondary)" }}>Enjoy the momentum.</p>
             </div>
-            <div style={{ display: "flex", gap: 12, marginTop: 26, flexWrap: "wrap" }}>
-              <Button size="lg" leadingIcon={<Icon name="Play" size={19} />} onClick={() => setInSession(true)}>Start focus session</Button>
-              <Button variant="secondary" size="lg" leadingIcon={<Icon name="Check" size={18} />}>Complete</Button>
-              <Button variant="ghost" size="lg" leadingIcon={<Icon name="SkipForward" size={18} />}>Skip</Button>
-            </div>
-          </div>
+          )}
 
           {/* Today progress */}
           <div style={{
@@ -161,13 +199,13 @@ export function FocusHome() {
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>Today's progress</h3>
-              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{d.date}</span>
+              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{formatLongDate(TODAY)}</span>
             </div>
-            <ProgressBar value={d.progress} showLabel />
+            <ProgressBar value={progress} showLabel />
             <div style={{ display: "flex", gap: 40, marginTop: 22 }}>
-              <StatBlock value={d.done} label="Tasks done" accent="var(--color-primary)" />
-              <StatBlock value={d.remaining} label="Remaining" />
-              <StatBlock value={`${d.streak}d`} label="Focus streak" accent="var(--color-accent)" />
+              <StatBlock value={done} label="Tasks done" accent="var(--color-primary)" />
+              <StatBlock value={total - done} label="Remaining" />
+              <StatBlock value={`${WORKO_DATA.streak}d`} label="Focus streak" accent="var(--color-accent)" />
             </div>
           </div>
 
@@ -179,22 +217,30 @@ export function FocusHome() {
             }}>
               <Icon name="ChevronRight" size={18} color="var(--text-muted)" style={{ transform: upNextOpen ? "rotate(90deg)" : "none", transition: "transform var(--dur-fast) var(--ease-out)" }} />
               <span style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>Up next</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>{WORKO_DATA.upNext.length}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>{upNext.length}</span>
             </button>
             {upNextOpen && (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {WORKO_DATA.upNext.map((u, i) => (
-                  <div key={i} style={{
+                {upNext.map((u) => (
+                  <div key={u.id} style={{
                     display: "flex", alignItems: "center", gap: 14, padding: "14px 18px",
                     background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-card)",
                     boxShadow: "var(--shadow-sm)",
                   }}>
-                    <span style={{ width: 22, height: 22, borderRadius: "50%", border: "2px solid var(--border-strong)", flexShrink: 0 }} />
+                    <button onClick={() => complete(u.id)} aria-label={`Complete ${u.title}`} style={{
+                      width: 22, height: 22, borderRadius: "50%", border: "2px solid var(--border-strong)",
+                      flexShrink: 0, background: "transparent", cursor: "pointer", padding: 0,
+                    }} />
                     <span style={{ flex: 1, fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>{u.title}</span>
-                    <span style={{ fontSize: 13, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}><Icon name="Clock" size={15} />{u.estimate}</span>
+                    {u.estimate && <span style={{ fontSize: 13, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}><Icon name="Clock" size={15} />{u.estimate}</span>}
                     <Badge tone="neutral">{u.priority}</Badge>
                   </div>
                 ))}
+                {upNext.length === 0 && (
+                  <div style={{ padding: "18px 20px", fontSize: 13.5, color: "var(--text-muted)", background: "var(--surface)", border: "1px dashed var(--border-strong)", borderRadius: "var(--radius-card)" }}>
+                    The queue is clear.
+                  </div>
+                )}
               </div>
             )}
           </div>

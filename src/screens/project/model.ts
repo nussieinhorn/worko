@@ -1,15 +1,20 @@
 /* Project Detail — shared data model, constants, and date helpers. */
 import React from "react";
-import { WORKO_DATA, type Priority, type Status } from "../../data/data";
+import type { Priority, Status } from "../../data/data";
 
 export interface Task {
   id: string;
+  projectId: string;
   title: string;
   status: Status;
   priority: Priority;
+  /** Assignee display name ("" when unassigned). */
   assignee: string;
+  assigneeId: string | null;
   ai?: boolean;
-  /** Timeline start index (days from TL_BASE). */
+  description: string;
+  estimate: string;
+  /** Timeline start index (days from TL_BASE). Derived from due + len. */
   start: number;
   /** Timeline length in days. */
   len: number;
@@ -17,34 +22,45 @@ export interface Task {
   scheduled: boolean;
 }
 
+/** Partial input for creating a task; missing fields get sensible defaults. */
+export interface NewTaskInput {
+  title?: string;
+  status?: Status;
+  priority?: Priority;
+  assignee?: string;
+  due?: Date;
+  len?: number;
+  scheduled?: boolean;
+}
+
 export type GroupBy = "status" | "priority" | "assignee" | "none";
 
 export const PRIORITY_TONE: Record<Priority, "error" | "warning" | "neutral"> = { High: "error", Medium: "warning", Low: "neutral" };
 export const PRIORITY_COLOR: Record<string, string> = { High: "#EF4444", Medium: "#F59E0B", Low: "#94A3B8" };
 export const COLUMN_DOT: Record<string, string> = { Backlog: "#94A3B8", "To do": "#6366F1", "In progress": "#4F46E5", Review: "#F59E0B", Done: "#10B981" };
-export const ASSIGNEE_COLOR: Record<string, string> = { "Maya Chen": "#4F46E5", "Sam Ito": "#06B6D4", "Lee Roy": "#6366F1", "Ana Diaz": "#10B981", "Tom B": "#F59E0B", "Priya N": "#EC4899" };
 export const STATUS_ORDER: Status[] = ["Backlog", "To do", "In progress", "Review", "Done"];
 export const PRIORITY_ORDER: Priority[] = ["High", "Medium", "Low"];
-export const ASSIGNEES = Object.keys(ASSIGNEE_COLOR);
 export const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 export const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export const TL_BASE = new Date(2026, 5, 8); // Mon Jun 8, 2026 — timeline / schedule origin
-export const TL_DAYS = 14;
-export const TODAY = new Date(2026, 5, 10); // Wed Jun 10, 2026
-export const TODAY_IDX = 2;
+/* Workspace members are loaded from the database at startup; the store calls
+   registerMembers() so grouping/filtering helpers can stay plain functions. */
+export const ASSIGNEES: string[] = [];
+export const ASSIGNEE_COLOR: Record<string, string> = {};
 
-const SCHEDULE: Record<string, { start: number; len: number }> = {
-  "Collect launch-day metrics plan": { start: 9, len: 3 },
-  "Draft FAQ for support team": { start: 8, len: 2 },
-  "Write press release": { start: 4, len: 3 },
-  "Schedule social posts": { start: 6, len: 2 },
-  "Draft the Q3 launch announcement": { start: 1, len: 4 },
-  "Build launch landing page": { start: 2, len: 5 },
-  "Final hero illustration": { start: 3, len: 2 },
-  "Lock launch date": { start: 0, len: 1 },
-  "Brief the exec team": { start: 0, len: 2 },
-};
+export function registerMembers(members: Array<{ name: string; color: string }>) {
+  ASSIGNEES.length = 0;
+  members.forEach((m) => {
+    ASSIGNEES.push(m.name);
+    ASSIGNEE_COLOR[m.name] = m.color;
+  });
+}
+
+/* The timeline shows TL_DAYS days starting TL_BASE, with today at TODAY_IDX. */
+export const TODAY = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+export const TODAY_IDX = 2;
+export const TL_DAYS = 14;
+export const TL_BASE = (() => { const d = new Date(TODAY); d.setDate(d.getDate() - TODAY_IDX); return d; })();
 
 export const fmtDate = (d: Date) => `${MON[d.getMonth()]} ${d.getDate()}`;
 export const sameDay = (a: Date | null | undefined, b: Date | null | undefined) =>
@@ -54,17 +70,6 @@ export const dueToIdx = (due: Date) => Math.max(0, Math.min(TL_DAYS - 1, Math.ro
 export const startFromDue = (due: Date, len: number) => Math.max(0, Math.min(TL_DAYS - len, dueToIdx(due) - (len - 1)));
 export const toInputDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 export const sundayOf = (d: Date) => { const x = new Date(d); x.setDate(x.getDate() - x.getDay()); x.setHours(0, 0, 0, 0); return x; };
-
-/* Seed tasks. Backlog items start unscheduled so the Calendar backlog rail has something to drag in. */
-export const INITIAL_TASKS: Task[] = (Object.entries(WORKO_DATA.board) as Array<[Status, typeof WORKO_DATA.board[Status]]>).flatMap(([status, tasks]) =>
-  tasks.map((t, i) => {
-    const sc = SCHEDULE[t.title] || { start: 0, len: 2 };
-    return { ...t, status, id: status.replace(/\s/g, "") + i, start: sc.start, len: sc.len, due: idxToDue(sc.start + sc.len - 1), scheduled: status !== "Backlog" };
-  })
-);
-
-let idSeq = 1;
-export const nextTaskId = () => "t" + (idSeq++);
 
 /* ============================ filter + grouping ============================ */
 export interface TaskFilter {

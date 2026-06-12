@@ -2,8 +2,8 @@
 import type React from "react";
 import { Avatar, Badge } from "../../components/ds";
 import { Icon, type IconName } from "../../components/Icon";
-import { WORKO_DATA, type Project } from "../../data/data";
-import { ASSIGNEES, ASSIGNEE_COLOR, COLUMN_DOT, MON, PRIORITY_TONE, STATUS_ORDER, TL_BASE, type Task } from "./model";
+import { WORKO_DATA } from "../../data/data";
+import { ASSIGNEES, ASSIGNEE_COLOR, COLUMN_DOT, MON, PRIORITY_TONE, STATUS_ORDER, TL_BASE, fmtDate, type Task } from "./model";
 
 function StatTile({ icon, tint, value, label, sub }: { icon: IconName; tint: string; value: React.ReactNode; label: string; sub?: string }) {
   return (
@@ -30,9 +30,10 @@ function Panel({ title, action, children }: { title: string; action?: string; ch
   );
 }
 
-export function OverviewView({ p, tasks, onOpenTask }: { p: Project; tasks: Task[]; onOpenTask: (t: Task) => void }) {
+export function OverviewView({ tasks, onOpenTask }: { tasks: Task[]; onOpenTask: (t: Task) => void }) {
   const total = tasks.length;
   const done = tasks.filter((t) => t.status === "Done").length;
+  const progress = total ? Math.round((done / total) * 100) : 0;
   const inProg = tasks.filter((t) => t.status === "In progress").length;
   const weekEnd = new Date(TL_BASE); weekEnd.setDate(weekEnd.getDate() + 6);
   const dueWeek = tasks.filter((t) => t.status !== "Done" && t.due.getTime() <= weekEnd.getTime()).length;
@@ -46,14 +47,14 @@ export function OverviewView({ p, tasks, onOpenTask }: { p: Project; tasks: Task
         <div style={{ background: "linear-gradient(135deg, var(--color-primary), #6366F1)", borderRadius: "var(--radius-card)", boxShadow: "var(--shadow-sm)", padding: 18, color: "#fff", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, opacity: 0.9 }}><Icon name="Target" size={16} color="#fff" />Project progress</div>
           <div>
-            <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1 }}>{p.progress}%</div>
-            <div style={{ height: 7, borderRadius: 999, background: "rgba(255,255,255,0.28)", marginTop: 12, overflow: "hidden" }}><div style={{ width: `${p.progress}%`, height: "100%", background: "#fff", borderRadius: 999 }} /></div>
+            <div style={{ fontSize: 38, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1 }}>{progress}%</div>
+            <div style={{ height: 7, borderRadius: 999, background: "rgba(255,255,255,0.28)", marginTop: 12, overflow: "hidden" }}><div style={{ width: `${progress}%`, height: "100%", background: "#fff", borderRadius: 999 }} /></div>
             <div style={{ fontSize: 12.5, opacity: 0.92, marginTop: 9 }}>{done} of {total} tasks complete</div>
           </div>
         </div>
         <StatTile icon="ListTodo" tint="#4F46E5" value={total} label="Total tasks" sub={`${total - done} still open`} />
         <StatTile icon="Loader" tint="#06B6D4" value={inProg} label="In progress" sub="Active right now" />
-        <StatTile icon="CalendarClock" tint="#F59E0B" value={dueWeek} label="Due this week" sub="Through Jun 14" />
+        <StatTile icon="CalendarClock" tint="#F59E0B" value={dueWeek} label="Due this week" sub={`Through ${fmtDate(weekEnd)}`} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
         <Panel title="Tasks by status" action="View board">
@@ -104,7 +105,7 @@ export function OverviewView({ p, tasks, onOpenTask }: { p: Project; tasks: Task
         </Panel>
         <Panel title="Recent activity">
           <div style={{ display: "flex", flexDirection: "column" }}>
-            {WORKO_DATA.taskDetail.activity.map((a, i) => (
+            {WORKO_DATA.assistant.activity.map((a, i) => (
               <div key={i} style={{ display: "flex", gap: 11, padding: "11px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
                 <Avatar name={a.who} size="xs" />
                 <div style={{ fontSize: 13, lineHeight: 1.45, color: "var(--text-secondary)" }}>
