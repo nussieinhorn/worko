@@ -1,0 +1,24 @@
+<!-- @dsCard group="Spacing" viewport="700x170" name="Radius Scale" subtitle="8 / 12 / 16 / 20 — inputs, buttons, cards, modals" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; font-family: var(--font-sans); background: var(--surface); padding: 24px; }
+  .row { display: flex; gap: 24px; align-items: flex-end; }
+  .item { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .box { width: 96px; height: 72px; background: var(--color-primary-light); border: 1.5px solid var(--color-primary); }
+  .name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+  .val { font-size: 11px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="item"><div class="box" style="border-radius:var(--radius-sm)"></div><span class="name">sm · 8px</span><span class="val">chips, tags</span></div>
+    <div class="item"><div class="box" style="border-radius:var(--radius-input)"></div><span class="name">input · 12px</span><span class="val">inputs, buttons</span></div>
+    <div class="item"><div class="box" style="border-radius:var(--radius-card)"></div><span class="name">card · 16px</span><span class="val">cards</span></div>
+    <div class="item"><div class="box" style="border-radius:var(--radius-modal)"></div><span class="name">modal · 20px</span><span class="val">modals, sheets</span></div>
+  </div>
+</body>
+</html>

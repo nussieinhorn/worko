@@ -1,0 +1,39 @@
+<!-- @dsCard group="Colors" viewport="700x190" name="Neutral Scale" subtitle="Slate — backgrounds, surfaces, borders, text" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; font-family: var(--font-sans); background: var(--surface); padding: 20px; }
+  .scale { display: flex; border-radius: var(--radius-card); overflow: hidden; border: 1px solid var(--border); }
+  .step { flex: 1; height: 72px; }
+  .labels { display: flex; margin-top: 10px; }
+  .lab { flex: 1; text-align: center; }
+  .lab .n { display: block; font-size: 11px; font-weight: 600; color: var(--text-primary); }
+  .lab .h { display: block; font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+  <div class="scale">
+    <div class="step" style="background:#F8FAFC"></div>
+    <div class="step" style="background:#F1F5F9"></div>
+    <div class="step" style="background:#E2E8F0"></div>
+    <div class="step" style="background:#CBD5E1"></div>
+    <div class="step" style="background:#94A3B8"></div>
+    <div class="step" style="background:#475569"></div>
+    <div class="step" style="background:#1E293B"></div>
+    <div class="step" style="background:#0F172A"></div>
+  </div>
+  <div class="labels">
+    <div class="lab"><span class="n">50</span><span class="h">F8FAFC</span></div>
+    <div class="lab"><span class="n">100</span><span class="h">F1F5F9</span></div>
+    <div class="lab"><span class="n">200</span><span class="h">E2E8F0</span></div>
+    <div class="lab"><span class="n">300</span><span class="h">CBD5E1</span></div>
+    <div class="lab"><span class="n">400</span><span class="h">94A3B8</span></div>
+    <div class="lab"><span class="n">600</span><span class="h">475569</span></div>
+    <div class="lab"><span class="n">800</span><span class="h">1E293B</span></div>
+    <div class="lab"><span class="n">900</span><span class="h">0F172A</span></div>
+  </div>
+</body>
+</html>

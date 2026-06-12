@@ -1,0 +1,6 @@
+<svg width="220" height="64" viewBox="0 0 220 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="16" fill="#4F46E5"></rect>
+  <path d="M20 22L31 32L20 42" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M34 42H45" stroke="#06B6D4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
+  <text x="80" y="42" font-family="Inter, sans-serif" font-size="34" font-weight="800" letter-spacing="-0.5" fill="#0F172A">WORKO</text>
+</svg>

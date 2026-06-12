@@ -1,0 +1,22 @@
+<!-- @dsCard group="Type" viewport="700x160" name="Display Numbers" subtitle="Inter SemiBold — tabular, for metrics & timers" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; font-family: var(--font-sans); background: var(--surface); padding: 24px; color: var(--text-primary); }
+  .row { display: flex; gap: 48px; align-items: baseline; }
+  .num { font-size: 60px; font-weight: 600; letter-spacing: var(--tracking-tight); font-variant-numeric: tabular-nums; line-height: 1; }
+  .accent { color: var(--color-primary); }
+  .meta { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-top: 6px; display: block; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div><span class="num">24:59</span><span class="meta">Focus timer</span></div>
+    <div><span class="num accent">87%</span><span class="meta">Day progress</span></div>
+    <div><span class="num">12</span><span class="meta">Tasks done</span></div>
+  </div>
+</body>
+</html>

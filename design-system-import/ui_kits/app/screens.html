@@ -1,0 +1,128 @@
+<!-- @dsCard group="App" viewport="1400x900" name="All Screens" subtitle="Overview canvas — every designed app surface side by side" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WORKO — All Screens</title>
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--font-sans); background: var(--bg-app); color: var(--text-primary); }
+  #root { height: 100vh; }
+  input::placeholder { color: var(--text-muted); }
+  @keyframes drawerIn { from { transform: translateX(24px); opacity: 0.4; } to { transform: translateX(0); opacity: 1; } }
+  /* keep each screen frame crisp inside the canvas */
+  .worko-screen { display: flex; width: 1280px; height: 800px; overflow: hidden; background: var(--bg-app); }
+  .worko-screen .worko-main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+  .worko-screen .worko-scroll { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="../../_ds_bundle.js"></script>
+
+  <script type="text/babel" src="icons.jsx"></script>
+  <script type="text/babel" src="data.jsx"></script>
+  <script type="text/babel" src="AppShell.jsx"></script>
+  <script type="text/babel" src="FocusHome.jsx"></script>
+  <script type="text/babel" src="ProjectDashboard.jsx"></script>
+  <script type="text/babel" src="ProjectDetail.jsx"></script>
+  <script type="text/babel" src="ProjectViews.jsx"></script>
+  <script type="text/babel" src="design-canvas.jsx"></script>
+
+  <script type="text/babel">
+    const noop = () => {};
+
+    /* Full app chrome (sidebar + optional topbar) wrapping any screen body. */
+    function Screen({ active, title, subtitle, children }) {
+      return (
+        <div className="worko-screen">
+          <Sidebar active={active} onNavigate={noop} />
+          <div className="worko-main">
+            {title !== null && <TopBar title={title} subtitle={subtitle} />}
+            <div className="worko-scroll">{children}</div>
+          </div>
+        </div>
+      );
+    }
+
+    const FRAME_W = 1280, FRAME_H = 800;
+
+    function App() {
+      return (
+        <DesignCanvas>
+          <DCSection id="primary" title="Primary surfaces" subtitle="The core screens of the WORKO workspace">
+            <DCArtboard id="focus-home" label="01 · Focus Home" width={FRAME_W} height={FRAME_H}>
+              <Screen active="home" title="Focus" subtitle="Wednesday, June 10 · 5 left for today">
+                <FocusHome />
+              </Screen>
+            </DCArtboard>
+
+            <DCArtboard id="projects" label="02 · Projects" width={FRAME_W} height={FRAME_H}>
+              <Screen active="projects" title="Projects" subtitle="6 active projects">
+                <ProjectDashboard onOpenProject={noop} />
+              </Screen>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="views" title="Project views" subtitle="Overview, List, Board, Calendar & Timeline — every view fully interactive">
+            <DCArtboard id="view-overview" label="Overview" width={FRAME_W} height={FRAME_H}>
+              <Screen active="projects" title={null}>
+                <ProjectDetail project={WORKO_DATA.projects[0]} onBack={noop} initialView="overview" />
+              </Screen>
+            </DCArtboard>
+
+            <DCArtboard id="view-list" label="List view" width={FRAME_W} height={FRAME_H}>
+              <Screen active="projects" title={null}>
+                <ProjectDetail project={WORKO_DATA.projects[0]} onBack={noop} initialView="list" />
+              </Screen>
+            </DCArtboard>
+
+            <DCArtboard id="view-board" label="Board view" width={FRAME_W} height={FRAME_H}>
+              <Screen active="projects" title={null}>
+                <ProjectDetail project={WORKO_DATA.projects[0]} onBack={noop} initialView="board" />
+              </Screen>
+            </DCArtboard>
+
+            <DCArtboard id="view-calendar" label="Calendar view" width={FRAME_W} height={FRAME_H}>
+              <Screen active="projects" title={null}>
+                <ProjectDetail project={WORKO_DATA.projects[0]} onBack={noop} initialView="calendar" />
+              </Screen>
+            </DCArtboard>
+
+            <DCArtboard id="view-timeline" label="Timeline view" width={FRAME_W} height={FRAME_H}>
+              <Screen active="projects" title={null}>
+                <ProjectDetail project={WORKO_DATA.projects[0]} onBack={noop} initialView="timeline" />
+              </Screen>
+            </DCArtboard>
+          </DCSection>
+
+          <DCSection id="states" title="Key states" subtitle="Full-screen overlays layered on the core surfaces">
+            <DCArtboard id="focus-session" label="Focus Session" width={FRAME_W} height={FRAME_H}>
+              <Screen active="home" title="Focus" subtitle="Wednesday, June 10 · 5 left for today">
+                <FocusSession onExit={noop} />
+              </Screen>
+            </DCArtboard>
+
+            <DCArtboard id="task-drawer" label="Task Drawer" width={FRAME_W} height={FRAME_H}>
+              <Screen active="projects" title={null}>
+                <ProjectDetail project={WORKO_DATA.projects[0]} onBack={noop} initialView="board" />
+                <TaskDrawer task={null} onClose={noop} />
+              </Screen>
+            </DCArtboard>
+          </DCSection>
+        </DesignCanvas>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!-- @dsCard group="App" viewport="1280x800" name="WORKO App" subtitle="Focus Home, Projects, Project Detail — interactive" -->
+<!-- @startingPoint section="App" subtitle="Full WORKO app — focus-first workspace" viewport="1280x800" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WORKO — App</title>
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--font-sans); background: var(--bg-app); color: var(--text-primary); }
+  #root { height: 100vh; }
+  .worko-app { display: flex; height: 100%; overflow: hidden; }
+  .worko-main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+  .worko-scroll { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+  @keyframes drawerIn { from { transform: translateX(24px); opacity: 0.4; } to { transform: translateX(0); opacity: 1; } }
+  input::placeholder { color: var(--text-muted); }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="../../_ds_bundle.js"></script>
+
+  <script type="text/babel" src="icons.jsx"></script>
+  <script type="text/babel" src="data.jsx"></script>
+  <script type="text/babel" src="AppShell.jsx"></script>
+  <script type="text/babel" src="FocusHome.jsx"></script>
+  <script type="text/babel" src="ProjectDashboard.jsx"></script>
+  <script type="text/babel" src="ProjectDetail.jsx"></script>
+  <script type="text/babel" src="ProjectViews.jsx"></script>
+
+  <script type="text/babel">
+    const TITLES = {
+      home: ["Focus", "Tuesday, June 9 · 5 left for today"],
+      tasks: ["My tasks", "Everything assigned to you"],
+      projects: ["Projects", "6 active projects"],
+      team: ["Team", "Workspace members"],
+      reports: ["Reports", "Productivity & momentum"],
+      settings: ["Settings", "Workspace & preferences"],
+    };
+
+    function App() {
+      const [screen, setScreen] = React.useState("home");
+      const [project, setProject] = React.useState(null);
+
+      const navigate = (id) => { setProject(null); setScreen(id); };
+      const openProject = (p) => { setProject(p); setScreen("projectDetail"); };
+
+      let title, subtitle, content;
+      if (screen === "home") {
+        [title, subtitle] = TITLES.home; content = <FocusHome />;
+      } else if (screen === "projects") {
+        [title, subtitle] = TITLES.projects; content = <ProjectDashboard onOpenProject={openProject} />;
+      } else if (screen === "projectDetail") {
+        title = null; content = <ProjectDetail project={project} onBack={() => navigate("projects")} />;
+      } else {
+        const t = TITLES[screen] || ["", ""];
+        [title, subtitle] = t;
+        content = (
+          <div style={{ padding: 60, textAlign: "center", color: "var(--text-muted)" }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: "var(--surface-secondary)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+              <Icon name="Hammer" size={24} color="var(--text-muted)" />
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text-secondary)" }}>{title} is outside this UI kit</div>
+            <div style={{ fontSize: 13.5, marginTop: 4 }}>Focus, Projects, and Project Detail are the reference surfaces.</div>
+          </div>
+        );
+      }
+
+      const activeNav = screen === "projectDetail" ? "projects" : screen;
+
+      return (
+        <div className="worko-app">
+          <Sidebar active={activeNav} onNavigate={navigate} />
+          <div className="worko-main">
+            {title !== null && <TopBar title={title} subtitle={subtitle} />}
+            <div className="worko-scroll">{content}</div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+/* WORKO — Color tokens
+   Base palette (raw values) + semantic aliases.
+   Calm, focused, modern. Deep indigo primary, vibrant cyan accent. */
+
+:root {
+  /* ---- Brand / Primary ---- */
+  --indigo-600: #4F46E5; /* Primary */
+  --indigo-700: #4338CA; /* Primary hover */
+  --indigo-50:  #EEF2FF; /* Primary light / tint */
+  --indigo-100: #E0E7FF;
+  --indigo-500: #6366F1;
+  --indigo-900: #312E81;
+
+  /* ---- Accent ---- */
+  --cyan-500: #06B6D4; /* Vibrant cyan accent */
+  --cyan-600: #0891B2;
+  --cyan-50:  #ECFEFF;
+
+  /* ---- Semantic status ---- */
+  --green-500:  #10B981; /* Success */
+  --green-50:   #ECFDF5;
+  --amber-500:  #F59E0B; /* Warning */
+  --amber-50:   #FFFBEB;
+  --red-500:    #EF4444; /* Error */
+  --red-50:     #FEF2F2;
+
+  /* ---- Neutral scale (slate) ---- */
+  --slate-50:  #F8FAFC; /* Background */
+  --white:     #FFFFFF; /* Surface */
+  --slate-100: #F1F5F9; /* Surface secondary */
+  --slate-200: #E2E8F0; /* Border */
+  --slate-300: #CBD5E1;
+  --slate-400: #94A3B8; /* Text muted */
+  --slate-500: #64748B;
+  --slate-600: #475569; /* Text secondary */
+  --slate-700: #334155;
+  --slate-800: #1E293B;
+  --slate-900: #0F172A; /* Text primary */
+
+  /* ---- Semantic aliases ---- */
+  --color-primary:        var(--indigo-600);
+  --color-primary-hover:  var(--indigo-700);
+  --color-primary-light:  var(--indigo-50);
+  --color-accent:         var(--cyan-500);
+  --color-accent-hover:   var(--cyan-600);
+
+  --color-success: var(--green-500);
+  --color-warning: var(--amber-500);
+  --color-error:   var(--red-500);
+
+  --bg-app:            var(--slate-50);
+  --surface:           var(--white);
+  --surface-secondary: var(--slate-100);
+  --border:            var(--slate-200);
+  --border-strong:     var(--slate-300);
+
+  --text-primary:   var(--slate-900);
+  --text-secondary: var(--slate-600);
+  --text-muted:     var(--slate-400);
+  --text-on-primary: var(--white);
+
+  /* Focus ring */
+  --ring: 0 0 0 3px rgba(79, 70, 229, 0.35);
+}
