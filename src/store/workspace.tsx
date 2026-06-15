@@ -14,10 +14,36 @@ export interface Member { id: string; name: string; role: string; color: string 
 export interface Project { id: string; name: string; desc: string; color: string; members: string[]; updatedAt: Date }
 export interface Subtask { id: string; taskId: string; label: string; done: boolean; position: number }
 
+export interface FocusSettings {
+  dailyGoal: number;
+  sessionMinutes: number;
+  priorityOrder: Priority[];
+  prioritizedProjectIds: string[];
+}
+
+export interface FocusSession {
+  id: string;
+  kind: "sprint" | "break";
+  taskId: string | null;
+  startedAt: Date;
+  endedAt: Date | null;
+  /** Sprint that ended by completing its task (counts toward the daily goal). */
+  completed: boolean;
+}
+
+const DEFAULT_SETTINGS: FocusSettings = {
+  dailyGoal: 5,
+  sessionMinutes: 25,
+  priorityOrder: ["High", "Medium", "Low"],
+  prioritizedProjectIds: [],
+};
+
+const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+
 interface TaskRow {
   id: string; project_id: string; title: string; status: Status; priority: Priority;
   assignee_id: string | null; ai_suggested: boolean; description: string; estimate: string;
-  due: string | null; len_days: number; scheduled: boolean;
+  due: string | null; len_days: number; scheduled: boolean; completed_at: string | null;
 }
 
 const PROJECT_COLORS = ["#4F46E5", "#06B6D4", "#10B981", "#F59E0B", "#6366F1", "#0891B2"];
@@ -42,6 +68,14 @@ export interface Workspace {
   updateSubtask: (id: string, patch: Partial<Pick<Subtask, "label" | "done">>) => void;
   deleteSubtask: (id: string) => void;
   reorderSubtasks: (taskId: string, orderedIds: string[]) => void;
+
+  settings: FocusSettings;
+  updateSettings: (patch: Partial<FocusSettings> | ((s: FocusSettings) => Partial<FocusSettings>)) => void;
+  /** Today's focus sessions (sprints + breaks), for the productivity panel. */
+  todaySessions: FocusSession[];
+  startSprint: (taskId: string) => string;
+  startBreak: () => string;
+  endSession: (id: string, completed?: boolean) => void;
 }
 
 const WorkspaceContext = React.createContext<Workspace | null>(null);
@@ -58,19 +92,28 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [tasks, setTasks] = React.useState<Task[]>([]);
   const [subtasks, setSubtasks] = React.useState<Subtask[]>([]);
+  const [settings, setSettings] = React.useState<FocusSettings>(DEFAULT_SETTINGS);
+  const [settingsId, setSettingsId] = React.useState<string | null>(null);
+  const [todaySessions, setTodaySessions] = React.useState<FocusSession[]>([]);
   const membersRef = React.useRef<Member[]>([]);
   membersRef.current = members;
+  // synchronously-current settings, so rapid stepper clicks chain correctly
+  const settingsRef = React.useRef(settings);
+  settingsRef.current = settings;
+  const saveSettingsTimer = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     if (!supabaseConfigured) return;
     let cancelled = false;
     (async () => {
-      const [m, p, pm, t, s] = await Promise.all([
+      const [m, p, pm, t, s, fs, fsess] = await Promise.all([
         supabase.from("members").select("id, name, role, color").order("created_at"),
         supabase.from("projects").select("id, name, description, color, updated_at").order("created_at"),
         supabase.from("project_members").select("project_id, member_id"),
-        supabase.from("tasks").select("id, project_id, title, status, priority, assignee_id, ai_suggested, description, estimate, due, len_days, scheduled").order("created_at"),
+        supabase.from("tasks").select("id, project_id, title, status, priority, assignee_id, ai_suggested, description, estimate, due, len_days, scheduled, completed_at").order("created_at"),
         supabase.from("subtasks").select("id, task_id, label, done, position").order("position"),
+        supabase.from("focus_settings").select("id, daily_goal, session_minutes, priority_order, prioritized_project_ids").limit(1).maybeSingle(),
+        supabase.from("focus_sessions").select("id, kind, task_id, started_at, ended_at, completed").gte("started_at", startOfToday().toISOString()).order("started_at"),
       ]);
       const err = m.error || p.error || pm.error || t.error || s.error;
       if (err) { console.error("[workspace] load failed:", err.message); return; }
@@ -98,11 +141,26 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           priority: row.priority, assignee: (row.assignee_id && nameById.get(row.assignee_id)) || "",
           assigneeId: row.assignee_id, ai: row.ai_suggested, description: row.description,
           estimate: row.estimate, due, len: row.len_days, start: startFromDue(due, row.len_days),
-          scheduled: row.scheduled,
+          scheduled: row.scheduled, completedAt: row.completed_at ? new Date(row.completed_at) : null,
         };
       }));
       setSubtasks((s.data ?? []).map((row: { id: string; task_id: string; label: string; done: boolean; position: number }) => ({
         id: row.id, taskId: row.task_id, label: row.label, done: row.done, position: row.position,
+      })));
+
+      if (fs.data) {
+        setSettingsId(fs.data.id);
+        setSettings({
+          dailyGoal: fs.data.daily_goal,
+          sessionMinutes: fs.data.session_minutes,
+          priorityOrder: fs.data.priority_order as Priority[],
+          prioritizedProjectIds: fs.data.prioritized_project_ids ?? [],
+        });
+      }
+      setTodaySessions(((fsess.data ?? []) as Array<{ id: string; kind: "sprint" | "break"; task_id: string | null; started_at: string; ended_at: string | null; completed: boolean }>).map((row) => ({
+        id: row.id, kind: row.kind, taskId: row.task_id,
+        startedAt: new Date(row.started_at), endedAt: row.ended_at ? new Date(row.ended_at) : null,
+        completed: row.completed,
       })));
       setLoading(false);
     })();
@@ -139,7 +197,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           id, projectId, title: input.title || "Untitled task", status: input.status || "To do",
           priority: input.priority || "Medium", assignee, assigneeId: memberIdByName(assignee),
           ai: false, description: "", estimate: "", due, len, start: startFromDue(due, len),
-          scheduled: input.scheduled !== false,
+          scheduled: input.scheduled !== false, completedAt: null,
         };
         setTasks((ts) => [...ts, task]);
         supabase.from("tasks").insert({
@@ -151,11 +209,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       updateTask: (id, patch) => {
         const full = { ...patch };
         if (patch.assignee !== undefined) full.assigneeId = memberIdByName(patch.assignee);
+        // stamp/clear completion time when the status crosses the Done line
+        if (patch.status !== undefined) full.completedAt = patch.status === "Done" ? new Date() : null;
         setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, ...full } : t)));
 
         const row: Record<string, unknown> = {};
         if (patch.title !== undefined) row.title = patch.title;
-        if (patch.status !== undefined) row.status = patch.status;
+        if (patch.status !== undefined) { row.status = patch.status; row.completed_at = full.completedAt ? full.completedAt.toISOString() : null; }
         if (patch.priority !== undefined) row.priority = patch.priority;
         if (patch.assignee !== undefined) row.assignee_id = full.assigneeId;
         if (patch.due !== undefined) row.due = toInputDate(patch.due);
@@ -199,8 +259,53 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           supabase.from("subtasks").update({ position: idx }).eq("id", id).then(logWrite("reorder subtasks"));
         });
       },
+
+      settings,
+
+      updateSettings: (patchOrFn) => {
+        const prev = settingsRef.current;
+        const patch = typeof patchOrFn === "function" ? patchOrFn(prev) : patchOrFn;
+        const next = { ...prev, ...patch };
+        settingsRef.current = next; // keep the ref ahead of the next render
+        setSettings(next);
+        // Debounced full-row write: rapid stepper clicks collapse to one final
+        // write, so the latest value always wins (no out-of-order races).
+        if (!settingsId) return;
+        if (saveSettingsTimer.current) clearTimeout(saveSettingsTimer.current);
+        saveSettingsTimer.current = window.setTimeout(() => {
+          const s = settingsRef.current;
+          supabase.from("focus_settings").update({
+            daily_goal: s.dailyGoal, session_minutes: s.sessionMinutes,
+            priority_order: s.priorityOrder, prioritized_project_ids: s.prioritizedProjectIds,
+          }).eq("id", settingsId).then(logWrite("update settings"));
+        }, 400);
+      },
+
+      todaySessions,
+
+      startSprint: (taskId) => {
+        const id = crypto.randomUUID();
+        const session: FocusSession = { id, kind: "sprint", taskId, startedAt: new Date(), endedAt: null, completed: false };
+        setTodaySessions((ss) => [...ss, session]);
+        supabase.from("focus_sessions").insert({ id, kind: "sprint", task_id: taskId, started_at: session.startedAt.toISOString() }).then(logWrite("start sprint"));
+        return id;
+      },
+
+      startBreak: () => {
+        const id = crypto.randomUUID();
+        const session: FocusSession = { id, kind: "break", taskId: null, startedAt: new Date(), endedAt: null, completed: false };
+        setTodaySessions((ss) => [...ss, session]);
+        supabase.from("focus_sessions").insert({ id, kind: "break", started_at: session.startedAt.toISOString() }).then(logWrite("start break"));
+        return id;
+      },
+
+      endSession: (id, completed = false) => {
+        const endedAt = new Date();
+        setTodaySessions((ss) => ss.map((x) => (x.id === id ? { ...x, endedAt, completed: completed || x.completed } : x)));
+        supabase.from("focus_sessions").update({ ended_at: endedAt.toISOString(), completed }).eq("id", id).then(logWrite("end session"));
+      },
     };
-  }, [loading, members, projects, tasks, subtasks]);
+  }, [loading, members, projects, tasks, subtasks, settings, settingsId, todaySessions]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }

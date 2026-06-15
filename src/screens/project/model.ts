@@ -20,6 +20,8 @@ export interface Task {
   len: number;
   due: Date;
   scheduled: boolean;
+  /** When the task was last marked Done (null if open). */
+  completedAt: Date | null;
 }
 
 /** Partial input for creating a task; missing fields get sensible defaults. */

@@ -11,6 +11,11 @@ export function formatMonthYear(d: Date) {
   return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+/** "9:14 AM" */
+export function formatClock(d: Date) {
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 /** "Just now" · "5m ago" · "2h ago" · "3d ago" */
 export function relTime(d: Date) {
   const mins = Math.floor((Date.now() - d.getTime()) / 60000);
