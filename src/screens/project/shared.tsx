@@ -3,6 +3,8 @@ import React from "react";
 import { Avatar, Button, IconButton } from "../../components/ds";
 import { Icon, type IconName } from "../../components/Icon";
 import { WORKO_DATA } from "../../data/data";
+import { parseTaskLines } from "../../lib/parseTasks";
+import { BulkPasteModal } from "./BulkPasteModal";
 import {
   ASSIGNEES, ASSIGNEE_COLOR, COLUMN_DOT, PRIORITY_COLOR, PRIORITY_ORDER, STATUS_ORDER, TODAY,
   fmtDate, toInputDate,
@@ -48,6 +50,14 @@ export function Tip({ task, place = "top", style, children }: { task?: Task; pla
 export function QuickAdd({ onAdd, placeholder = "Add task", style }: { onAdd: (title: string) => void; placeholder?: string; style?: React.CSSProperties }) {
   const [open, setOpen] = React.useState(false);
   const [v, setV] = React.useState("");
+  const [pending, setPending] = React.useState<string[] | null>(null);
+
+  const onPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const lines = parseTaskLines(e.clipboardData.getData("text"));
+    if (lines.length > 1) { e.preventDefault(); setPending(lines); }
+  };
+  const confirmBulk = () => { pending?.forEach((t) => onAdd(t)); setPending(null); setV(""); setOpen(false); };
+
   if (!open) return (
     <button onClick={() => setOpen(true)} style={{
       display: "flex", alignItems: "center", gap: 7, width: "100%", padding: "8px 10px", border: "none",
@@ -60,21 +70,35 @@ export function QuickAdd({ onAdd, placeholder = "Add task", style }: { onAdd: (t
     </button>
   );
   return (
-    <input autoFocus value={v} placeholder="Task name, then Enter" onChange={(e) => setV(e.target.value)}
-      onKeyDown={(e) => { if (e.key === "Enter" && v.trim()) { onAdd(v.trim()); setV(""); } if (e.key === "Escape") { setOpen(false); setV(""); } }}
-      onBlur={() => { if (!v.trim()) setOpen(false); }}
-      style={{ width: "100%", height: 34, padding: "0 11px", background: "var(--surface)", border: "1px solid var(--color-primary)", borderRadius: 9, fontFamily: "var(--font-sans)", fontSize: 13.5, color: "var(--text-primary)", outline: "none", ...style }} />
+    <>
+      <input autoFocus value={v} placeholder="Task name, then Enter" onChange={(e) => setV(e.target.value)} onPaste={onPaste}
+        onKeyDown={(e) => { if (e.key === "Enter" && v.trim()) { onAdd(v.trim()); setV(""); } if (e.key === "Escape") { setOpen(false); setV(""); } }}
+        onBlur={() => { if (!v.trim()) setOpen(false); }}
+        style={{ width: "100%", height: 34, padding: "0 11px", background: "var(--surface)", border: "1px solid var(--color-primary)", borderRadius: 9, fontFamily: "var(--font-sans)", fontSize: 13.5, color: "var(--text-primary)", outline: "none", ...style }} />
+      {pending && <BulkPasteModal titles={pending} onConfirm={confirmBulk} onCancel={() => setPending(null)} />}
+    </>
   );
 }
 
 export function MiniInput({ onSubmit, onClose, placeholder = "Task name…" }: { onSubmit: (title: string) => void; onClose: () => void; placeholder?: string }) {
   const [v, setV] = React.useState("");
+  const [pending, setPending] = React.useState<string[] | null>(null);
+
+  const onPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const lines = parseTaskLines(e.clipboardData.getData("text"));
+    if (lines.length > 1) { e.preventDefault(); setPending(lines); }
+  };
+  const confirmBulk = () => { pending?.forEach((t) => onSubmit(t)); setPending(null); setV(""); onClose(); };
+
   return (
-    <input autoFocus value={v} placeholder={placeholder} onClick={(e) => e.stopPropagation()}
-      onChange={(e) => setV(e.target.value)}
-      onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter" && v.trim()) { onSubmit(v.trim()); setV(""); } if (e.key === "Escape") onClose(); }}
-      onBlur={() => { if (!v.trim()) onClose(); }}
-      style={{ width: "100%", marginTop: 4, padding: "5px 7px", fontSize: 11.5, fontFamily: "var(--font-sans)", border: "1px solid var(--color-primary)", borderRadius: 6, outline: "none", color: "var(--text-primary)" }} />
+    <>
+      <input autoFocus value={v} placeholder={placeholder} onClick={(e) => e.stopPropagation()}
+        onChange={(e) => setV(e.target.value)} onPaste={onPaste}
+        onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter" && v.trim()) { onSubmit(v.trim()); setV(""); } if (e.key === "Escape") onClose(); }}
+        onBlur={() => { if (!v.trim() && !pending) onClose(); }}
+        style={{ width: "100%", marginTop: 4, padding: "5px 7px", fontSize: 11.5, fontFamily: "var(--font-sans)", border: "1px solid var(--color-primary)", borderRadius: 6, outline: "none", color: "var(--text-primary)" }} />
+      {pending && <BulkPasteModal titles={pending} onConfirm={confirmBulk} onCancel={() => { setPending(null); onClose(); }} />}
+    </>
   );
 }
 

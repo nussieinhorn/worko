@@ -76,7 +76,7 @@ export function ProjectDetail({ project, onBack, initialView }: { project: Proje
       <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "20px 32px 36px" }}>
         {view === "overview" && <OverviewView tasks={tasks} onOpenTask={(t) => setOpenTaskId(t.id)} />}
         {view !== "overview" && <Toolbar f={f} count={f.filtered.length} showGroup={view !== "calendar"} onAdd={() => setModal({})} />}
-        {view === "list" && <ListView f={f} onToggle={toggleDone} onOpenTask={(t) => setOpenTaskId(t.id)} onAdd={addTask} />}
+        {view === "list" && <ListView f={f} onToggle={toggleDone} onOpenTask={(t) => setOpenTaskId(t.id)} onAdd={addTask} onUpdate={ws.updateTask} />}
         {view === "board" && <BoardView f={f} onOpenTask={(t) => setOpenTaskId(t.id)} onApplyGroup={applyGroup} onAdd={addTask} />}
         {view === "calendar" && <CalendarView f={f} onOpenTask={(t) => setOpenTaskId(t.id)} onSchedule={schedule} onAdd={addTask} />}
         {view === "timeline" && <TimelineView f={f} onOpenTask={(t) => setOpenTaskId(t.id)} onReschedule={reschedule} onResize={resize} onAdd={addTask} />}

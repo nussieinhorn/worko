@@ -3,9 +3,11 @@ import React from "react";
 import { Avatar, Badge } from "../../components/ds";
 import { Icon } from "../../components/Icon";
 import { formatMonthYear } from "../../lib/format";
+import type { Priority, Status } from "../../data/data";
 import {
-  COLUMN_DOT, DOW, MON, PRIORITY_TONE, TL_DAYS, TODAY, TODAY_IDX,
-  fmtDate, groupMeta, groupTasks, idxToDue, sameDay, sundayOf,
+  ASSIGNEES, COLUMN_DOT, DOW, MON, PRIORITY_COLOR, PRIORITY_ORDER, PRIORITY_TONE,
+  STATUS_ORDER, TL_DAYS, TODAY, TODAY_IDX,
+  fmtDate, groupMeta, groupTasks, idxToDue, sameDay, startFromDue, sundayOf, toInputDate,
   type NewTaskInput, type Task, type TaskFilter,
 } from "./model";
 import { EmptyState, MiniInput, QuickAdd, Tip } from "./shared";
@@ -101,12 +103,24 @@ export function BoardView({ f, onOpenTask, onApplyGroup, onAdd }: {
 }
 
 /* ============================ List view ============================ */
-function ListRow({ task, done, onToggle, onOpen }: { task: Task; done: boolean; onToggle: () => void; onOpen: () => void }) {
+const LIST_COLS = "1fr 144px 122px 146px 150px";
+
+function ListRow({ task, done, onToggle, onOpen, onUpdate }: {
+  task: Task; done: boolean; onToggle: () => void; onOpen: () => void;
+  onUpdate: (patch: Partial<Task>) => void;
+}) {
   const [hover, setHover] = React.useState(false);
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  const cellSelect: React.CSSProperties = {
+    height: 30, minWidth: 0, flex: 1, borderRadius: 7, padding: "0 4px",
+    border: `1px solid ${hover ? "var(--border)" : "transparent"}`, background: hover ? "var(--surface)" : "transparent",
+    fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)",
+    cursor: "pointer", outline: "none", transition: "border-color var(--dur-fast) var(--ease-out)",
+  };
   return (
     <div onClick={onOpen} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={{
-      display: "grid", gridTemplateColumns: "1fr 130px 92px 96px 40px", gap: 14, alignItems: "center",
-      padding: "12px 18px", borderTop: "1px solid var(--border)", cursor: "pointer",
+      display: "grid", gridTemplateColumns: LIST_COLS, gap: 14, alignItems: "center",
+      padding: "10px 18px", borderTop: "1px solid var(--border)", cursor: "pointer",
       background: hover ? "var(--bg-app)" : "transparent", transition: "background var(--dur-fast) var(--ease-out)",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
@@ -118,23 +132,49 @@ function ListRow({ task, done, onToggle, onOpen }: { task: Task; done: boolean; 
         <span style={{ fontSize: 14, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: done ? "var(--text-muted)" : "var(--text-primary)", textDecoration: done ? "line-through" : "none" }}>{task.title}</span>
         {task.ai && <Icon name="Sparkles" size={14} color="var(--cyan-600)" style={{ flexShrink: 0 }} />}
       </div>
-      <span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: "var(--text-secondary)" }}>
-        <span style={{ width: 7, height: 7, borderRadius: "50%", background: COLUMN_DOT[task.status] }} />{task.status}
+
+      {/* Status */}
+      <span onClick={stop} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: COLUMN_DOT[task.status], flexShrink: 0 }} />
+        <select value={task.status} onChange={(e) => onUpdate({ status: e.target.value as Status })} style={cellSelect}>
+          {STATUS_ORDER.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
       </span>
-      <Badge tone={PRIORITY_TONE[task.priority]}>{task.priority}</Badge>
-      <span style={{ fontSize: 12.5, color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
-        <Icon name="Calendar" size={13} color="var(--text-muted)" />{fmtDate(task.due)}
+
+      {/* Priority */}
+      <span onClick={stop} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: PRIORITY_COLOR[task.priority], flexShrink: 0 }} />
+        <select value={task.priority} onChange={(e) => onUpdate({ priority: e.target.value as Priority })} style={cellSelect}>
+          {PRIORITY_ORDER.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
       </span>
-      <Avatar name={task.assignee} size="xs" />
+
+      {/* Due */}
+      <span onClick={stop} style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+        <input type="date" value={toInputDate(task.due)} onChange={(e) => {
+          if (!e.target.value) return;
+          const due = new Date(e.target.value + "T00:00:00");
+          onUpdate({ due, start: startFromDue(due, task.len), scheduled: true });
+        }} style={{ ...cellSelect, fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)" }} />
+      </span>
+
+      {/* Assignee */}
+      <span onClick={stop} style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+        <Avatar name={task.assignee} size="xs" />
+        <select value={task.assignee} onChange={(e) => onUpdate({ assignee: e.target.value })} style={cellSelect}>
+          {ASSIGNEES.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+      </span>
     </div>
   );
 }
 
-export function ListView({ f, onToggle, onOpenTask, onAdd }: {
+export function ListView({ f, onToggle, onOpenTask, onAdd, onUpdate }: {
   f: TaskFilter;
   onToggle: (id: string) => void;
   onOpenTask: (t: Task) => void;
   onAdd: (t: NewTaskInput) => void;
+  onUpdate: (id: string, patch: Partial<Task>) => void;
 }) {
   if (!f.filtered.length) return <EmptyState label="Try clearing search or filters." />;
   const groups = groupTasks(f.filtered, f.groupBy);
@@ -142,8 +182,8 @@ export function ListView({ f, onToggle, onOpenTask, onAdd }: {
   const doneCount = f.filtered.filter((t) => t.status === "Done").length;
   return (
     <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-card)", boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 130px 92px 96px 40px", gap: 14, padding: "11px 18px", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)" }}>
-        <span>Task · {doneCount}/{f.filtered.length} done</span><span>Status</span><span>Priority</span><span>Due</span><span></span>
+      <div style={{ display: "grid", gridTemplateColumns: LIST_COLS, gap: 14, padding: "11px 18px", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+        <span>Task · {doneCount}/{f.filtered.length} done</span><span>Status</span><span>Priority</span><span>Due</span><span>Assignee</span>
       </div>
       {groups.map(([label, tasks]) => (
         <div key={label}>
@@ -152,7 +192,7 @@ export function ListView({ f, onToggle, onOpenTask, onAdd }: {
             <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-secondary)" }}>{label}</span>
             <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>{tasks.length}</span>
           </div>
-          {tasks.map((t) => <ListRow key={t.id} task={t} done={t.status === "Done"} onToggle={() => onToggle(t.id)} onOpen={() => onOpenTask(t)} />)}
+          {tasks.map((t) => <ListRow key={t.id} task={t} done={t.status === "Done"} onToggle={() => onToggle(t.id)} onOpen={() => onOpenTask(t)} onUpdate={(patch) => onUpdate(t.id, patch)} />)}
           <div style={{ borderTop: "1px solid var(--border)", padding: "4px 12px" }}>
             <QuickAdd onAdd={(title) => onAdd(f.groupBy === "none" ? { title } : { title, [meta.field]: label } as NewTaskInput)} />
           </div>
