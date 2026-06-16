@@ -12,7 +12,7 @@ import { buildQueue } from "./focus/queue";
 import { FocusSession } from "./focus/FocusSession";
 import { BreakModal } from "./focus/BreakModal";
 import { NextPrompt } from "./focus/NextPrompt";
-import { FocusSettings } from "./focus/FocusSettings";
+import { FocusSettingsButton, FocusSettingsDrawer } from "./focus/FocusSettingsDrawer";
 import { ProgressPanel } from "./focus/ProgressPanel";
 
 export function FocusHome() {
@@ -27,6 +27,7 @@ export function FocusHome() {
   const [brk, setBrk] = React.useState<{ id: string; startedAt: Date } | null>(null);
   // "ready for next?" prompt after a sprint or break
   const [prompt, setPrompt] = React.useState<{ title: string } | null>(null);
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
 
   const queue = buildQueue(tasks, settings, skipped);
   const hero = queue[0] ?? null;
@@ -176,9 +177,11 @@ export function FocusHome() {
         {/* Side column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <ProgressPanel />
-          <FocusSettings />
+          <FocusSettingsButton onClick={() => setSettingsOpen(true)} />
         </div>
       </div>
+
+      {settingsOpen && <FocusSettingsDrawer onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

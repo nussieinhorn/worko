@@ -97,10 +97,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [todaySessions, setTodaySessions] = React.useState<FocusSession[]>([]);
   const membersRef = React.useRef<Member[]>([]);
   membersRef.current = members;
-  // synchronously-current settings, so rapid stepper clicks chain correctly
   const settingsRef = React.useRef(settings);
   settingsRef.current = settings;
-  const saveSettingsTimer = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     if (!supabaseConfigured) return;
@@ -266,19 +264,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         const prev = settingsRef.current;
         const patch = typeof patchOrFn === "function" ? patchOrFn(prev) : patchOrFn;
         const next = { ...prev, ...patch };
-        settingsRef.current = next; // keep the ref ahead of the next render
+        settingsRef.current = next;
         setSettings(next);
-        // Debounced full-row write: rapid stepper clicks collapse to one final
-        // write, so the latest value always wins (no out-of-order races).
         if (!settingsId) return;
-        if (saveSettingsTimer.current) clearTimeout(saveSettingsTimer.current);
-        saveSettingsTimer.current = window.setTimeout(() => {
-          const s = settingsRef.current;
-          supabase.from("focus_settings").update({
-            daily_goal: s.dailyGoal, session_minutes: s.sessionMinutes,
-            priority_order: s.priorityOrder, prioritized_project_ids: s.prioritizedProjectIds,
-          }).eq("id", settingsId).then(logWrite("update settings"));
-        }, 400);
+        supabase.from("focus_settings").update({
+          daily_goal: next.dailyGoal, session_minutes: next.sessionMinutes,
+          priority_order: next.priorityOrder, prioritized_project_ids: next.prioritizedProjectIds,
+        }).eq("id", settingsId).then(logWrite("update settings"));
       },
 
       todaySessions,
